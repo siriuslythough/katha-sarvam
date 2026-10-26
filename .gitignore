@@ -1,0 +1,13 @@
+.env
+.env.*
+__pycache__/
+library/
+tmp/
+.streamlit/secrets.toml
+.venv/
+dist/
+*.log
+paper-brief.md
+*.pdf
+*.wav
+*.mp3
