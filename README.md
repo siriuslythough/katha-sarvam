@@ -9,7 +9,7 @@ Built for a hackathon using **Sarvam AI**, with Indian folk-art motifs, patterne
 - **PDF upload and parsing:** Sarvam Document Intelligence digitises the paper. The app checks that all reported pages were returned before proceeding; there is no local PDF-text fallback.
 - **Research understanding:** Sarvam-105B analyses extracted text, evidence and page references for an age-appropriate explanation.
 - **Four narration languages:** Hindi, English, Punjabi and Telugu. Choose the paper's language and the storytelling language separately.
-- **Story writing and review:** Sarvam-105B writes the story and checks another draft against the analysis and supporting evidence. It is instructed to distinguish analogies from research, and simulations from real deployments.
+- **Story writing and review:** Sarvam-105B Conversations writes the story and checks another draft against the analysis and supporting evidence. It is instructed to distinguish analogies from research, and simulations from real deployments.
 - **Spoken narration:** Sarvam Bulbul v3 uses the fixed **Ratan** voice for a warm, mature storyteller persona. This is not a clone of a real elder.
 - **Audio with synchronized text:** Play, pause, seek, and click a passage to hear it. Highlighting follows passage boundaries calculated from generated WAV files; it is not word-level alignment.
 - **Downloads:** Save narration as WAV and the transcript as text.
@@ -31,7 +31,7 @@ These are future features, not options available in the current app.
 Uploaded PDF
     → Sarvam Document Intelligence
     → Sarvam-105B: evidence-based analysis
-    → Sarvam-105B: story writing and factual review
+    → Sarvam-105B Conversations: story writing and factual review
     → Sarvam Bulbul v3: narration in the selected language
     → Audio player + synchronized passages + downloads + feedback
 ```

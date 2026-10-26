@@ -7,7 +7,6 @@ import tempfile
 from datetime import datetime, timezone
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from sarvam_pipeline import ROOT, LANGUAGES, STORY_VERSION, analyse_pdf, generate_story, read_json, write_json
 
@@ -18,7 +17,7 @@ def player(story, audio):
     """Use WAV-derived passage times for both highlighting and click-to-seek."""
     payload = json.dumps(story["segments"], ensure_ascii=True).replace("<", "\\u003c")
     encoded = base64.b64encode(audio).decode("ascii")
-    components.html("""<!doctype html><html><head><meta charset="utf-8"><style>
+    st.iframe("""<!doctype html><html><head><meta charset="utf-8"><style>
     body{margin:0;background:#fffdf7;color:#283e34;font:18px/1.8 system-ui,sans-serif}
     audio{width:100%;margin:10px 0}#passages{height:320px;overflow:auto;padding:10px}
     button{display:block;text-align:left;width:100%;border:0;border-left:3px solid transparent;
@@ -38,7 +37,7 @@ def player(story, audio):
       if(i===active)return;buttons.forEach((b,j)=>{b.classList.toggle('active',j===i);b.setAttribute('aria-current',j===i?'true':'false');});
       active=i;if(i>=0&&document.getElementById('follow').checked)buttons[i].scrollIntoView({block:'nearest',behavior:'smooth'});}
     audio.addEventListener('timeupdate',sync);audio.addEventListener('seeked',sync);
-    </script></body></html>""", height=475, scrolling=False)
+    </script></body></html>""", height=475)
 
 
 def show_error(error):
@@ -109,8 +108,9 @@ with left:
         st.caption("Ratan · a warm, mature voice · an imagined elder sharing real research")
         st.caption("Stories aim for 2–3 minutes. More narrators and a choice of duration are planned.")
     if st.session_state.papers:
+        paper_titles = {key: value["title"] for key, value in st.session_state.papers.items()}
         st.selectbox("Your story shelf", list(st.session_state.papers), key="selected_paper",
-                     format_func=lambda value: st.session_state.papers[value]["title"])
+                     format_func=paper_titles.get)
     st.caption("Your shelf belongs to this session. Download recordings before closing or refreshing; this demo is not a permanent online library.")
 
 with right:

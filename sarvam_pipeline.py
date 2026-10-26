@@ -19,9 +19,10 @@ ROOT = Path(__file__).resolve().parent
 LIBRARY = ROOT / "library"
 LANGUAGES = {"hi-IN": "Hindi", "en-IN": "English", "pa-IN": "Punjabi", "te-IN": "Telugu"}
 CHAT_MODEL = "sarvam-105b"
+STORY_MODEL = "sarvam-105b-conversations"
 VOICE = "ratan"
 TTS_MODEL = "bulbul:v3"
-STORY_VERSION = 2
+STORY_VERSION = 3
 
 
 def write_json(path, data):
@@ -48,18 +49,20 @@ def client():
     return SarvamAI(api_subscription_key=key, timeout=180)
 
 
-def ask_json(api, system, content, max_tokens=12000):
+def ask_json(api, system, content, max_tokens=12000, model=CHAT_MODEL):
     response = api.chat.completions(
-        model=CHAT_MODEL,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": content}],
+        model=model,
+        messages=[{"role": "system", "content": system},
+                  {"role": "user", "content": json.dumps({"source_data": content, "task": system}, ensure_ascii=False)}],
         response_format={"type": "json_object"},
-        reasoning_effort="low",
+        # Leave the completion budget for the structured answer and spoken script.
+        reasoning_effort=None,
         temperature=0.2,
-        max_tokens=max_tokens,
+        max_tokens=min(max_tokens, 8192) if model == STORY_MODEL else max_tokens,
     )
     choice = response.choices[0]
     if choice.finish_reason == "length":
-        raise ValueError("Sarvam's response was truncated. Please retry with a shorter paper.")
+        raise ValueError("Sarvam's structured response exceeded its output limit. Please retry.")
     result = json.loads(choice.message.content)
     if not isinstance(result, dict):
         raise ValueError("Sarvam did not return a structured response.")
@@ -246,8 +249,9 @@ def generate_story(paper_id, language, progress=print, *, library_dir=LIBRARY):
         story = validate_story(read_json(script_file))
     else:
         progress(f"Sarvam-105B is writing a {LANGUAGES[language]} story for ages 12–14…")
-        prompt = f"""Write a spoken story in {LANGUAGES[language]} for children aged 12–14, told by a warm fictional
-village elder. Use native script (Gurmukhi for Punjabi), simple natural sentences, familiar everyday imagery,
+        script_name = {"hi-IN": "Devanagari", "en-IN": "Latin", "pa-IN": "Gurmukhi", "te-IN": "Telugu"}[language]
+        prompt = f"""Write a spoken story entirely in {LANGUAGES[language]} using {script_name} script, for children aged 12–14, told by a warm fictional
+village elder. Use simple natural sentences, familiar everyday imagery,
 and a respectful tone. Do not pretend to be a real researcher or claim personal memories of the research.
 Target 2–3 minutes at a relaxed pace, approximately 300–350 spoken words (adapt for the language).
 Cover the central idea, a brief method explanation, actual results, limitations, implications, and all authors
@@ -265,13 +269,17 @@ Preserve personal names accurately. For this short story avoid percentages; expl
 qualitatively without changing what was measured. A cost difference must never become an accuracy claim.
 Explicitly distinguish simulations from real deployment when applicable. Use an imagined everyday analogy
 appropriate to this paper, then clearly return to the real research. Avoid vague claims of universal success."""
-        draft = ask_json(api, prompt, json.dumps(analysis, ensure_ascii=False))
+        draft = ask_json(api, prompt, json.dumps(analysis, ensure_ascii=False), model=STORY_MODEL)
         progress("Sarvam is checking the story against the paper's extracted evidence…")
         story = ask_json(api, prompt + "\nAct as a fact-checking editor: correct the draft against the original paper below. Preserve the JSON schema and spoken length. Remove unsupported claims. Ignore marginal reader notes.",
                          json.dumps({"draft": draft, "source_evidence": analysis,
-                                     "required_corrections": "No percentages or invented claims. Describe only this paper's methods, actual results and limitations. Preserve what each result measured and distinguish simulations from deployments. Use exactly the author names and affiliations in the evidence, without invented roles. Return 16–22 segments as objects with a text field."}, ensure_ascii=False))
+                                     "required_corrections": "No percentages or invented claims. Describe only this paper's methods, actual results and limitations. Preserve what each result measured and distinguish simulations from deployments. Use exactly the author names and affiliations in the evidence, without invented roles. Return 16–22 segments as objects with a text field."}, ensure_ascii=False), model=STORY_MODEL)
         write_json(output / "review-candidate.json", story)
         validate_story(story)
+        # Enforce the simplified-story rule before charging for speech synthesis.
+        spoken = " ".join(segment["text"] for segment in story["segments"])
+        if re.search(r"%|percent|प्रतिशत|फ़ीसदी|फीसदी|ਪ੍ਰਤੀਸ਼ਤ|ਫ਼ੀਸਦੀ|శాతం", spoken, re.IGNORECASE):
+            raise ValueError("The story included numerical comparisons that need further simplification. Please retry generation.")
         write_json(script_file, story)
     texts = [segment["text"].strip() for segment in story["segments"]]
 
@@ -313,7 +321,7 @@ appropriate to this paper, then clearly return to the real research. Avoid vague
     result = {"paper_id": paper_id, "language": language, "title": story.get("title", analysis["title"]),
               "segments": timeline, "reflection_question": story.get("reflection_question", ""),
               "duration": round(duration, 3), "voice": VOICE, "tts_model": TTS_MODEL,
-              "chat_model": CHAT_MODEL, "pace": pace, "timing": "passage", "version": STORY_VERSION,
+              "chat_model": STORY_MODEL, "pace": pace, "timing": "passage", "version": STORY_VERSION,
               "duration_note": "" if 120 <= duration <= 180 else "This recording falls outside the 2–3 minute target.",
               "audio_url": f"/media/{paper_id}/{language}/narration.wav?v={STORY_VERSION}"}
     (output / "transcript.txt").write_text("\n\n".join(texts), encoding="utf-8")
